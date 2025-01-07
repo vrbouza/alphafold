@@ -143,6 +143,21 @@ flags.DEFINE_boolean('use_gpu_relax', None, 'Whether to relax on GPU. '
                      'recommended to enable if possible. GPUs must be available'
                      ' if this setting is enabled.')
 
+
+########################################
+# flags.DEFINE_integer(
+#     'threads', 1,
+#     'Max. number of threads to be used')
+flags.DEFINE_integer(
+    'num_recycles', None,
+    'Set number of recycles.')
+flags.DEFINE_string(
+    'max_msa', None,
+    'Set number of maximum sequences and extra sequences to be used in the MSAs.')
+########################################
+
+
+
 FLAGS = flags.FLAGS
 
 MAX_TEMPLATE_HITS = 20
@@ -512,9 +527,34 @@ def main(argv):
   for model_name in model_names:
     model_config = config.model_config(model_name)
     if run_multimer_system:
+      ########################################
+      if FLAGS.num_recycles is not None:
+        model_config.model.num_recycle = FLAGS.num_recycles
+
+      if FLAGS.max_msa is not None:
+        splits = FLAGS.max_msa.split(":")
+        max_seq = int(splits[0])
+        max_extra_seq = int(splits[1])
+        model_config.model.embeddings_and_evoformer.num_msa = max_seq
+        model_config.model.embeddings_and_evoformer.num_extra_msa = max_extra_seq
+      ########################################
       model_config.model.num_ensemble_eval = num_ensemble
+
     else:
+      ########################################
+      if FLAGS.num_recycles is not None:
+        model_config.data.common.num_recycle = FLAGS.num_recycles
+        model_config.model.num_recycle       = FLAGS.num_recycles
+
+      if FLAGS.max_msa is not None:
+        splits = FLAGS.max_msa.split(":")
+        max_seq = int(splits[0])
+        max_extra_seq = int(splits[1])
+        model_config.data.eval.max_msa_clusters = max_seq
+        model_config.data.common.max_extra_msa = max_extra_seq
+      ########################################
       model_config.data.eval.num_ensemble = num_ensemble
+
     model_params = data.get_model_haiku_params(
         model_name=model_name, data_dir=FLAGS.data_dir)
     model_runner = model.RunModel(model_config, model_params)

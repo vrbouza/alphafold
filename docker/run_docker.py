@@ -94,6 +94,21 @@ flags.DEFINE_string(
     'Valid options are: uid or uid:gid, non-numeric values are not recognised '
     'by Docker unless that user has been created within the container.')
 
+########################################
+flags.DEFINE_integer(
+    'threads', 1,
+    'Max. number of threads to be used')
+flags.DEFINE_integer(
+    'num_recycles', None,
+    'Set number of recycles.')
+flags.DEFINE_string(
+    'max_msa', None,
+    'Set number of maximum sequences and extra sequences to be used in the MSAs.')
+flags.DEFINE_integer(
+    'random_seed', None,
+    'Set random seed to be used (note that this doesn´t provide complete determinism in predictions if GPU is used in the computations).')
+########################################
+
 FLAGS = flags.FLAGS
 
 _ROOT_MOUNT_DIRECTORY = '/mnt/'
@@ -217,22 +232,42 @@ def main(argv):
   use_gpu_relax = FLAGS.enable_gpu_relax and FLAGS.use_gpu
 
   command_args.extend([
-      f'--output_dir={output_target_path}',
-      f'--max_template_date={FLAGS.max_template_date}',
-      f'--db_preset={FLAGS.db_preset}',
-      f'--model_preset={FLAGS.model_preset}',
-      f'--benchmark={FLAGS.benchmark}',
-      f'--use_precomputed_msas={FLAGS.use_precomputed_msas}',
-      f'--num_multimer_predictions_per_model={FLAGS.num_multimer_predictions_per_model}',
-      f'--models_to_relax={FLAGS.models_to_relax}',
-      f'--use_gpu_relax={use_gpu_relax}',
-      '--logtostderr',
+    f'--output_dir={output_target_path}',
+    f'--max_template_date={FLAGS.max_template_date}',
+    f'--db_preset={FLAGS.db_preset}',
+    f'--model_preset={FLAGS.model_preset}',
+    f'--benchmark={FLAGS.benchmark}',
+    f'--use_precomputed_msas={FLAGS.use_precomputed_msas}',
+    f'--num_multimer_predictions_per_model={FLAGS.num_multimer_predictions_per_model}',
+    f'--models_to_relax={FLAGS.models_to_relax}',
+    f'--use_gpu_relax={use_gpu_relax}',
+    '--logtostderr',
   ])
 
+
+  ########################################
+  if FLAGS.random_seed is not None:
+    command_args.append(f"--random_seed={FLAGS.random_seed}")
+  if FLAGS.max_msa is not None:
+    command_args.append(f"--max_msa={FLAGS.max_msa}")
+  if FLAGS.num_recycles is not None:
+    command_args.append(f"--num_recycles={FLAGS.num_recycles}")
+  ########################################
+
+
   client = docker.from_env()
-  device_requests = [
-      docker.types.DeviceRequest(driver='nvidia', capabilities=[['gpu']])
-  ] if FLAGS.use_gpu else None
+  # device_requests = [
+  #    docker.types.DeviceRequest(driver='nvidia', capabilities=[['gpu']])
+  # ] if FLAGS.use_gpu else None
+
+
+  ########################################
+  device_requests = (
+    [docker.types.DeviceRequest(driver="nvidia", capabilities=[["gpu"]], count=-1)]
+    if FLAGS.use_gpu
+    else None
+  )
+  ########################################
 
   container = client.containers.run(
       image=FLAGS.docker_image_name,
@@ -242,12 +277,24 @@ def main(argv):
       detach=True,
       mounts=mounts,
       user=FLAGS.docker_user,
-      environment={
+      environment = {
           'NVIDIA_VISIBLE_DEVICES': FLAGS.gpu_devices,
+          'CUDA_VISIBLE_DEVICES'  : FLAGS.gpu_devices,
           # The following flags allow us to make predictions on proteins that
           # would typically be too long to fit into GPU memory.
           'TF_FORCE_UNIFIED_MEMORY': '1',
-          'XLA_PYTHON_CLIENT_MEM_FRACTION': '4.0',
+#          'XLA_PYTHON_CLIENT_MEM_FRACTION': '4.0',
+          'XLA_PYTHON_CLIENT_MEM_FRACTION': '10.0',    # 10 times the GPU memory in total
+
+          ########################################
+          # Slightly increased logging
+          "TF_CPP_MIN_LOG_LEVEL" : "0",
+
+          # Attempt (apparently TF might do whatever it wants in any case...) at limiting the number TF spawned threads
+          "OMP_NUM_THREADS"        : f"{FLAGS.threads}",
+          "TF_NUM_INTEROP_THREADS" : f"{FLAGS.threads}",
+          "TF_NUM_INTRAOP_THREADS" : f"{FLAGS.threads}",
+          ########################################
       })
 
   # Add signal handler to ensure CTRL+C also stops the running container.

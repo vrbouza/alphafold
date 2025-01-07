@@ -35,7 +35,7 @@ class Jackhmmer:
                *,
                binary_path: str,
                database_path: str,
-               n_cpu: int = 8,
+               n_cpu: int = 1,
                n_iter: int = 1,
                e_value: float = 0.0001,
                z_value: Optional[int] = None,
@@ -75,7 +75,13 @@ class Jackhmmer:
       logging.error('Could not find Jackhmmer database %s', database_path)
       raise ValueError(f'Could not find Jackhmmer database {database_path}')
 
-    self.n_cpu = n_cpu
+    envvars = os.environ
+    if "OMP_NUM_THREADS" in envvars:
+      self.n_cpu = int(envvars["OMP_NUM_THREADS"])
+      # logging.info("Jackhmmer will use up to {self.n_cpu} threads.".format())
+    else:
+      self.n_cpu = n_cpu
+
     self.n_iter = n_iter
     self.e_value = e_value
     self.z_value = z_value

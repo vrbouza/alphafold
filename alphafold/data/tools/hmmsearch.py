@@ -85,11 +85,11 @@ class Hmmsearch(object):
       out_path = os.path.join(query_tmp_dir, 'output.sto')
       with open(hmm_input_path, 'w') as f:
         f.write(hmm)
-
+      envvars = os.environ
       cmd = [
           self.binary_path,
           '--noali',  # Don't include the alignment in stdout.
-          '--cpu', '8'
+          '--cpu', '1' if "OMP_NUM_THREADS" not in envvars else envvars["OMP_NUM_THREADS"],
       ]
       # If adding flags, we have to do so before the output and input:
       if self.flags:

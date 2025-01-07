@@ -47,9 +47,12 @@ RUN git clone --branch v3.3.0 https://github.com/soedinglab/hh-suite.git /tmp/hh
 
 # Install Miniconda package manager.
 RUN wget -q -P /tmp \
-  https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
-    && bash /tmp/Miniconda3-latest-Linux-x86_64.sh -b -p /opt/conda \
-    && rm /tmp/Miniconda3-latest-Linux-x86_64.sh
+    https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh \
+    && bash /tmp/Miniforge3-$(uname)-$(uname -m).sh -b -p /opt/conda \
+    && rm /tmp/Miniforge3-$(uname)-$(uname -m).sh
+#  https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
+#    && bash /tmp/Miniconda3-latest-Linux-x86_64.sh -b -p /opt/conda \
+#    && rm /tmp/Miniconda3-latest-Linux-x86_64.sh
 
 # Install conda packages.
 ENV PATH="/opt/conda/bin:$PATH"
@@ -76,6 +79,13 @@ RUN chmod u+s /sbin/ldconfig.real
 
 # Currently needed to avoid undefined_symbol error.
 RUN ln -sf /usr/lib/x86_64-linux-gnu/libffi.so.7 /opt/conda/lib/libffi.so.7
+
+RUN groupadd -g 1009 vglusers && \
+    groupadd -g 1006 vrbouza && \
+    useradd -ms /bin/bash vrbouza -u 1005 -g 1006 && \
+    usermod -a -G vglusers,video,sudo vrbouza && \
+    usermod -a -G vglusers,video root
+
 
 # We need to run `ldconfig` first to ensure GPUs are visible, due to some quirk
 # with Debian. See https://github.com/NVIDIA/nvidia-docker/issues/1399 for

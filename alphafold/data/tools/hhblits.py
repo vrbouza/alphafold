@@ -35,7 +35,7 @@ class HHBlits:
                *,
                binary_path: str,
                databases: Sequence[str],
-               n_cpu: int = 4,
+               n_cpu: int = 1,
                n_iter: int = 3,
                e_value: float = 0.001,
                maxseq: int = 1_000_000,
@@ -82,7 +82,12 @@ class HHBlits:
         logging.error('Could not find HHBlits database %s', database_path)
         raise ValueError(f'Could not find HHBlits database {database_path}')
 
-    self.n_cpu = n_cpu
+    envvars = os.environ
+    if "OMP_NUM_THREADS" in envvars:
+      self.n_cpu = int(envvars["OMP_NUM_THREADS"])
+      # logging.info("Jackhmmer will use up to {self.n_cpu} threads.".format())
+    else:
+      self.n_cpu = n_cpu
     self.n_iter = n_iter
     self.e_value = e_value
     self.maxseq = maxseq
